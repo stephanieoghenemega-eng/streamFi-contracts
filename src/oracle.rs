@@ -35,7 +35,8 @@ impl TwapOracleIntegration {
             .get(&soroban_sdk::symbol_short!("OracleCfg"))
             .ok_or(Error::OracleNotConfigured)?;
 
-        // Invoke the external Oracle contract
+        // Invoke the external Oracle contract securely.
+        // Important: Ensure the oracle_address is a trusted and whitelisted contract.
         // In a real environment, this would call `get_price` on the oracle_address
         let current_time = env.ledger().timestamp();
         
@@ -57,11 +58,17 @@ impl TwapOracleIntegration {
     }
 
     pub fn calculate_fiat_stream_payout(env: Env, token_amount: u64) -> Result<u64, Error> {
-        let current_price = Self::get_twap_price(env)?;
+        let current_price = Self::get_twap_price(env.clone())?;
         
-        // Example logic: convert a nominal token amount into its fiat equivalent
-        // Value = amount * price / (10^decimals)
-        let value = (token_amount as u128 * current_price as u128) / 10_000_000u128;
+        let config: OracleConfig = env
+            .storage()
+            .instance()
+            .get(&soroban_sdk::symbol_short!("OracleCfg"))
+            .unwrap();
+
+        // Convert a nominal token amount into its fiat equivalent
+        let precision = 10u128.pow(config.decimals);
+        let value = (token_amount as u128 * current_price as u128) / precision;
         
         Ok(value as u64)
     }
